@@ -2,6 +2,22 @@
 @section('title', 'Loan '.$loan->reference)
 @section('content')
 
+@push('head')
+<style>
+@media (max-width: 767.98px) {
+    .member-reorder { display: contents; }
+    .member-reorder > .col-lg-7,
+    .member-reorder > .col-lg-5 { display: contents; }
+    .member-reorder #card-summary { order: 1; }
+    .member-reorder #card-statement { order: 2; }
+    .member-reorder #card-repayment-form { order: 3; }
+    .member-reorder #card-pending { order: 4; }
+    .member-reorder #card-repayments-detail { order: 5; }
+    .member-reorder #card-member { order: 6; }
+}
+</style>
+@endpush
+
 @php
     $u = auth()->user();
     $canDecide = $u->can('decide', $loan);
@@ -22,6 +38,7 @@
         $remainingPrincipal = max(0, (float) $loan->principal - $paidPrincipal);
     }
     $currency = $loan->group->currency ?? '';
+    $isMemberOnly = $u->hasRole('member') && ! $u->hasAnyRole(['super_admin','group_admin','treasurer','secretary']);
 @endphp
 
 <x-page_header :title="'Loan '.$loan->reference" :pretitle="$loan->member->full_name.' · '.$loan->group->name">
@@ -30,11 +47,11 @@
     </x-slot>
 </x-page_header>
 
-<div class="row row-cards mt-3">
+<div class="row row-cards mt-3 @if($isMemberOnly) member-reorder @endif">
 
     {{-- Summary --}}
     <div class="col-lg-7">
-        <div class="card">
+        <div class="card" id="card-summary">
             <div class="card-header">
                 <h3 class="card-title">Summary</h3>
                 <div class="ms-auto d-flex align-items-center gap-2">
@@ -178,7 +195,7 @@
 
         {{-- Loan Statement (unified chronological ledger) --}}
         @if($ledger->isNotEmpty())
-        <div class="card mt-3">
+        <div class="card mt-3" id="card-statement">
             <div class="card-header">
                 <h3 class="card-title"><i class="ti ti-list-details me-1 text-blue"></i>Loan statement</h3>
                 <span class="ms-auto text-muted small">chronological ledger</span>
@@ -266,7 +283,7 @@
         {{-- Repayments detail (principal / interest split per approved payment) --}}
         @php $approvedRepayments = $loan->repayments->where('status','approved'); @endphp
         @if($approvedRepayments->isNotEmpty())
-        <div class="card mt-3">
+        <div class="card mt-3" id="card-repayments-detail">
             <div class="card-header">
                 <h3 class="card-title">Repayments — principal / interest split</h3>
             </div>
@@ -338,7 +355,7 @@
             </div>
         </div>
         @else
-        <div class="card mt-3">
+        <div class="card mt-3" id="card-repayments-detail">
             <div class="card-header"><h3 class="card-title">Repayments</h3></div>
             <div class="card-body text-center text-muted py-4">No repayments recorded yet.</div>
         </div>
@@ -440,9 +457,9 @@
 
         @if($canRecord && in_array($loan->status, ['disbursed','repaying']))
         @php
-            $isMemberRole = auth()->user()->hasRole('member') && ! auth()->user()->hasAnyRole(['super_admin','group_admin','treasurer','secretary']);
+            $isMemberRole = $isMemberOnly;
         @endphp
-        <div class="card">
+        <div class="card" id="card-repayment-form">
             <div class="card-header">
                 <h3 class="card-title">
                     @if($isMemberRole)
@@ -608,7 +625,7 @@
 
         {{-- Pending repayments awaiting approval --}}
         @if($pendingRepayments->isNotEmpty())
-        <div class="card mt-3 border-warning">
+        <div class="card mt-3 border-warning" id="card-pending">
             <div class="card-header bg-warning-lt">
                 <h3 class="card-title text-warning">
                     <i class="ti ti-clock me-1"></i>Pending repayments
@@ -687,7 +704,7 @@
         </div>
         @endif
 
-        <div class="card mt-3">
+        <div class="card mt-3" id="card-member">
             <div class="card-header"><h3 class="card-title">Member</h3></div>
             <div class="card-body d-flex align-items-center">
                 <span class="avatar avatar-md me-3" style="background-image:url('{{ $loan->member->photo_url }}')"></span>
