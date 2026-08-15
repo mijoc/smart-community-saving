@@ -455,7 +455,15 @@
                     <span class="ms-auto badge bg-warning-lt">Interest due: {{ number_format($unpaidInterest, 0) }}</span>
                 @endif
             </div>
-            <form method="POST" action="{{ route('loans.repayments.store', $loan) }}" class="card-body" id="repayment-form" enctype="multipart/form-data">@csrf
+            @if($isMemberRole && $pendingRepayments->isNotEmpty())
+            <div class="card-body">
+                <div class="alert alert-warning mb-0 small">
+                    <i class="ti ti-clock me-1"></i>
+                    You already have a repayment waiting for approval. You can submit another payment after this one is approved or rejected.
+                </div>
+            </div>
+            @endif
+            <form method="POST" action="{{ route('loans.repayments.store', $loan) }}" class="card-body" id="repayment-form" enctype="multipart/form-data" @if($isMemberRole && $pendingRepayments->isNotEmpty()) onsubmit="return false;" @endif>@csrf
 
                 @if($isMemberRole)
                 <div class="alert alert-info py-2 mb-3 small">
@@ -585,8 +593,10 @@
                         <div class="form-text">JPG, PNG, WebP or PDF · max 5 MB</div>
                     </div>
                 </div>
-                <button class="btn btn-primary mt-3 w-100" id="repayment-submit-btn">
-                    @if($isMemberRole)
+                <button class="btn btn-primary mt-3 w-100" id="repayment-submit-btn" @if($isMemberRole && $pendingRepayments->isNotEmpty()) disabled @endif>
+                    @if($isMemberRole && $pendingRepayments->isNotEmpty())
+                        <i class="ti ti-clock me-1"></i>Awaiting approval
+                    @elseif($isMemberRole)
                         <i class="ti ti-send me-1"></i>Submit for approval
                     @else
                         <i class="ti ti-receipt me-1"></i>Record repayment
@@ -904,6 +914,13 @@
 
     radios.forEach(r => r.addEventListener('change', onTypeChange));
     accrualCbs.forEach(cb => cb.addEventListener('change', onCheckboxChange));
+
+    form.addEventListener('submit', function () {
+        const submitButton = document.getElementById('repayment-submit-btn');
+        if (!submitButton || submitButton.disabled) return;
+        submitButton.disabled = true;
+        submitButton.innerHTML = '<i class="ti ti-loader-2 me-1"></i>Submitting…';
+    });
 
     // Run once on load
     onTypeChange();

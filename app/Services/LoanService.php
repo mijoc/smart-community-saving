@@ -8,6 +8,7 @@ use App\Models\LoanRepayment;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Validation\ValidationException;
 
 class LoanService
 {
@@ -181,10 +182,22 @@ class LoanService
         }
 
         return DB::transaction(function () use ($loan, $data, $recorderId, $pending) {
+            $loan        = Loan::query()->whereKey($loan->id)->lockForUpdate()->firstOrFail();
             $amount      = (float) $data['amount'];
             $paymentType = $data['payment_type'] ?? 'full';
 
             if ($pending) {
+                if ($loan->repayments()->where('status', 'pending')->exists()) {
+                    throw ValidationException::withMessages([
+                        'amount' => 'A repayment for this loan is already waiting for approval.',
+                    ]);
+                }
+
+                if ($amount > (float) $loan->outstanding) {
+                    throw ValidationException::withMessages([
+                        'amount' => 'The repayment cannot be greater than the current outstanding balance.',
+                    ]);
+                }
                 // Member-submitted: don't touch the loan balance yet.
                 // Portions will be recalculated on approval.
                 $rep = LoanRepayment::create([
@@ -197,6 +210,7 @@ class LoanService
                     'reference'         => $data['reference'] ?? null,
                     'recorded_by'       => $recorderId,
                     'notes'             => $data['notes'] ?? null,
+                    'proof_file'        => $data['proof_file'] ?? null,
                     'status'            => 'pending',
                     'payment_type'      => $paymentType,
                     'accrual_period'    => $data['accrual_period'] ?? null,
@@ -220,6 +234,7 @@ class LoanService
                 'reference'         => $data['reference'] ?? null,
                 'recorded_by'       => $recorderId,
                 'notes'             => $data['notes'] ?? null,
+                'proof_file'        => $data['proof_file'] ?? null,
                 'status'            => 'approved',
                 'payment_type'      => $paymentType,
                 'accrual_period'    => $data['accrual_period'] ?? null,
